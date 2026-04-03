@@ -6,7 +6,7 @@ import torch
 import wandb
 from transformers import BertTokenizer, DistilBertForSequenceClassification
 
-
+wandb.login(key=st.secrets["WANDB_API_KEY"])
 ARTIFACT_NAME = (
     "nguyenquochieujff7-ho-chi-minh-city-university-of-technology/"
     "bert-models/DistilBERT_Full:v0"
