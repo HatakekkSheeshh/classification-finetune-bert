@@ -1,150 +1,136 @@
-# LSTM vs Transformer Comparison for 20 Newsgroups Classification
+# LSTM vs Transformer for 20 Newsgroups Text Classification
 
-This project compares the performance of BiLSTM with Attention and Transformer models (BERT/DistilBERT) on the 20 Newsgroups text classification task.
+This project benchmarks a **BiLSTM + Attention** model against **BERT / DistilBERT fine-tuning** on the **20 Newsgroups** multi-class text classification task, then packages the best Transformer checkpoint into a **Streamlit inference app**.
 
-## Project Overview
+## Highlights
 
-| Aspect | Description |
-|--------|-------------|
-| **Dataset** | 20 Newsgroups (18,846 documents, 20 classes) |
-| **Task** | Multi-class text classification |
-| **Models** | BiLSTM + Attention vs BERT/DistilBERT |
-| **Framework** | PyTorch + HuggingFace Transformers |
+- Built an end-to-end NLP comparison pipeline from preprocessing, training, evaluation, and error analysis to model serving.
+- Compared a classical sequence model (**BiLSTM + Attention + GloVe**) with contextual Transformer encoders (**BERT**, **DistilBERT**).
+- Evaluated multiple fine-tuning strategies: **frozen backbone**, **hybrid training**, and **full fine-tuning**.
+- Deployed a lightweight **DistilBERT Streamlit demo** that loads a checkpoint from **Weights & Biases Artifacts**.
 
-## Project Structure
+## Tech Stack
 
+| Category | Tools |
+|---|---|
+| Modeling | PyTorch, Hugging Face Transformers |
+| Data & Training | datasets, pandas, numpy, tqdm |
+| Experiment Tracking | Weights & Biases |
+| Visualization | matplotlib |
+| App Demo | Streamlit |
+
+## Repository Structure
+
+```text
+classification-finetune-bert/
+|-- app.py                 # Streamlit app for DistilBERT inference
+|-- bert_finetune.ipynb    # BERT / DistilBERT training and evaluation
+|-- biALSTM.ipynb          # BiLSTM + Attention training and evaluation
+|-- artifacts/             # Downloaded model artifact cache
+|-- requirements.txt       # Python dependencies
+`-- README.md
 ```
-lstm_vs_transformer/
-├── bert_finetune.ipynb      # BERT/DistilBERT training & evaluation
-├── biALSTM.ipynb            # BiLSTM with Attention training & evaluation
-├── train_lstm.py            # Standalone LSTM training script
-├── requirements.txt         # Python dependencies
-├── note.txt                 # BiLSTM architecture explained
-├── lstm_1.png              # BiLSTM classification report
-├── lstm_2.png              # BiLSTM confusion matrix
-└── short_docs.png           # Short documents analysis
+
+## Dataset
+
+| Item | Description |
+|---|---|
+| Dataset | 20 Newsgroups |
+| Task | 20-class news topic classification |
+| Total samples | 18,846 documents |
+| Train / Val / Test | 8,201 / 2,051 / 6,757 |
+
+## Model Summary
+
+### BiLSTM + Attention
+
+- 300-dimension GloVe embedding
+- TF-IDF weighted token representations
+- 2-layer Bidirectional LSTM with hidden size 128
+- Self-attention pooling and dropout regularization
+- ~15.8M parameters
+
+### BERT / DistilBERT
+
+- `bert-base-uncased`: 12 layers, 768 hidden size, ~109.5M parameters
+- `distilbert-base-uncased`: 6 layers, 768 hidden size, ~67.0M parameters
+- Training strategies:
+  - Freeze backbone, train classifier head only
+  - Hybrid training: head warm-up then unfreeze full model
+  - Full fine-tuning
+
+## Results
+
+| Model | Strategy | Val Accuracy | Test Accuracy | Training Time | Inference Latency | Parameters |
+|---|---|---:|---:|---:|---:|---:|
+| BERT | Full fine-tuning | 79.96% | 74.17% | 1,168s | 87.9ms | 109.5M |
+| BERT | Hybrid | 79.86% | **74.77%** | 1,337s | 88.3ms | 109.5M |
+| DistilBERT | Full fine-tuning | 79.33% | 74.06% | 644s | 44.4ms | 67.0M |
+| DistilBERT | Hybrid | 78.89% | 73.88% | 735s | 44.1ms | 67.0M |
+| BiLSTM + Attention | - | 69.72% | 62.90% | **85s** | - | **15.8M** |
+
+## Key Takeaways
+
+- Transformer fine-tuning outperformed BiLSTM + Attention by around **11.9% absolute test accuracy**.
+- **DistilBERT** achieved a better speed/accuracy trade-off than BERT, with roughly **2x faster inference** and fewer parameters.
+- BiLSTM trained much faster and was more compact, but static GloVe embeddings struggled with semantically overlapping categories such as politics and religion.
+- Error analysis showed lower F1-score on short documents and classes with strong vocabulary overlap, especially `talk.religion.misc`, `talk.politics.misc`, and `alt.atheism`.
+
+## Streamlit Demo
+
+The app in `app.py` loads the fine-tuned **DistilBERT_Full** checkpoint from W&B Artifacts, preprocesses raw text, and returns **Top-K predicted classes** with probabilities.
+
+### Run Locally
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
-## Quick Start
+### W&B Artifact Note
 
-### 1. Install Dependencies
+The demo expects a W&B API key in Streamlit secrets:
+
+```toml
+WANDB_API_KEY = "your_wandb_api_key"
+```
+
+If the artifact is private, make sure your W&B account has permission to access:
+
+```text
+nguyenquochieujff7-ho-chi-minh-city-university-of-technology/bert-models/DistilBERT_Full:v0
+```
+
+Downloaded checkpoints are cached under `artifacts/DistilBERT_Full-v0/`.
+
+## How to Reproduce
+
+1. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Run Notebooks
+2. Run model experiments
 
-- **`bert_finetune.ipynb`**: Trains BERT and DistilBERT with 3 strategies (freeze backbone, hybrid, full fine-tuning)
-- **`biALSTM.ipynb`**: Trains BiLSTM with GloVe embeddings, TF-IDF weighting, and attention
+- Open `biALSTM.ipynb` to train and evaluate the BiLSTM + Attention baseline.
+- Open `bert_finetune.ipynb` to fine-tune BERT and DistilBERT with different training strategies.
 
-### 3. Key Results
+3. Launch the inference app
 
-| Model | Strategy | Val Acc | Test Acc | Training Time | Inference | Parameters |
-|-------|----------|---------|----------|---------------|-----------|------------|
-| **BERT** | Full Fine-tune | 79.96% | **74.17%** | 1,168s | 87.9ms | 109.5M |
-| **BERT** | Hybrid | 79.86% | 74.77% | 1,337s | 88.3ms | 109.5M |
-| **DistilBERT** | Full Fine-tune | 79.33% | 74.06% | 644s | 44.4ms | 67.0M |
-| **DistilBERT** | Hybrid | 78.89% | 73.88% | 735s | 44.1ms | 67.0M |
-| **BiLSTM + Attention** | - | 69.72% | 62.90% | **85s** | - | **15.8M** |
-
-### 4. Key Findings
-
-- **Best Transformer**: DistilBERT achieves 74.06% test accuracy with full fine-tuning
-- **Accuracy Gap**: BERT/DistilBERT outperforms BiLSTM by ~11% (74.1% vs 62.9%)
-- **Efficiency**: BiLSTM trains 7-16x faster than transformers (85s vs 644-1,337s)
-- **Inference Speed**: DistilBERT is 2x faster than BERT (44ms vs 88ms)
-- **Size**: BiLSTM is 4-7x smaller than transformer models (15.8M vs 67-109M params)
-- **Architecture Impact**: Contextualized representations (transformers) are essential for fine-grained classification
-
-## Model Architectures
-
-### BiLSTM with Attention
-
-```
-Input (token IDs)
-    ↓
-Embedding Layer (300d GloVe) + TF-IDF weighting
-    ↓
-2-layer Bidirectional LSTM (hidden=128)
-    ↓
-Self-Attention Layer
-    ↓
-Dropout (0.3)
-    ↓
-Linear (256 → 20)
-    ↓
-Output (20 classes)
+```bash
+streamlit run app.py
 ```
 
-**Parameters**: 15,840,981
+## Project Structure for Recruiters
 
-### Transformer (BERT/DistilBERT)
+- **Problem**: Fine-grained multi-class text classification on noisy user-generated newsgroup posts.
+- **Approach**: Compare sequence modeling with static embeddings versus Transformer contextual representations.
+- **Impact**: Quantified the accuracy-efficiency trade-off and delivered a working model demo for interactive inference.
 
-- **BERT-base-uncased**: 12 layers, 768 hidden, 12 heads → 109.5M parameters
-- **DistilBERT**: 6 layers, 768 hidden, 6 heads → 66.0M parameters
-- **Training Strategies**: Freeze backbone, Hybrid (head → full), Full fine-tuning
+## Future Improvements
 
-## Dataset Details
-
-| Split | Samples |
-|-------|---------|
-| Train | 8,201 |
-| Validation | 2,051 |
-| Test | 6,757 |
-
-**Classes**: 20 newsgroups covering:
-- `comp.*` (6 classes): hardware, graphics, OS, mac, windows, forsale
-- `rec.*` (4 classes): autos, motorcycles, baseball, hockey
-- `sci.*` (4 classes): cryptography, electronics, med, space
-- `talk.*` (4 classes): politics (guns, mideast, misc), religion
-- `soc.*` (1 class): religion.christian
-- `misc.*` (1 class): forsale
-- `alt.*` (1 class): atheism
-
-## Per-Class Performance (BiLSTM)
-
-### Best Performers
-| Class | F1-Score |
-|-------|----------|
-| rec.sport.hockey | 0.89 |
-| rec.sport.baseball | 0.78 |
-| rec.motorcycles | 0.72 |
-
-### Worst Performers
-| Class | F1-Score |
-|-------|----------|
-| talk.religion.misc | 0.19 |
-| talk.politics.misc | 0.26 |
-| alt.atheism | 0.29 |
-
-## Challenges Identified
-
-1. **Class Overlap**: Religion/politics newsgroups share 80-90% vocabulary
-2. **Short Documents**: comp.graphics, sci.electronics have 60%+ docs under 100 words
-3. **Cross-posting**: Same discussions appear in multiple newsgroups
-4. **Static Embeddings**: BiLSTM uses fixed GloVe vectors without context
-
-## Dependencies
-
-```
-torch>=2.1.0
-transformers>=4.36.0
-datasets>=2.16.0
-tokenizers>=0.15.0
-accelerate>=0.25.0
-wandb>=0.16.0
-numpy>=1.24.0
-matplotlib>=3.7.0
-pandas>=2.0.0
-tqdm>=4.65.0
-psutil>=5.9.0
-```
-
-## Conclusion
-
-This project demonstrates that:
-1. Transformer models significantly outperform BiLSTM on fine-grained text classification
-2. The ~11% accuracy gap is mainly due to contextualized representations
-3. Attention mechanisms on static embeddings cannot fully compensate for lack of context
-4. For this dataset, architectural choices matter more than optimization tweaks
+- Add a public model checkpoint or Hugging Face Hub release to make the demo easier to run without private W&B access.
+- Export core notebook logic into reusable Python modules for cleaner training pipelines.
+- Add experiment config files and automated metric logging for easier reproducibility.
+- Extend evaluation with macro-F1, per-class confusion analysis, and calibration metrics.
